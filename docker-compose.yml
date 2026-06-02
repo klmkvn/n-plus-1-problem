@@ -1,0 +1,42 @@
+version: "3.9"
+
+services:
+
+  db:
+    image: postgres:16-alpine
+    container_name: nplusone-db
+    environment:
+      POSTGRES_DB: nplusone_db
+      POSTGRES_USER: nplusone
+      POSTGRES_PASSWORD: nplusone
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      # Mount SQL files so you can also init the DB manually if needed
+      - ./src/main/resources/data/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - ./src/main/resources/data/data.sql:/docker-entrypoint-initdb.d/02-data.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nplusone -d nplusone_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    container_name: nplusone-app
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/nplusone_db
+      SPRING_DATASOURCE_USERNAME: nplusone
+      SPRING_DATASOURCE_PASSWORD: nplusone
+      # Toggle security without rebuilding:
+      APP_SECURITY_ENABLED: "true"
+    ports:
+      - "8080:8080"
+
+volumes:
+  pg_data:
